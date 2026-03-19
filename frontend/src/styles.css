@@ -305,6 +305,63 @@ body {
 .section-title { margin: 0 0 14px; font-size: 1.05rem; font-weight: 700; }
 .section-desc { margin: -8px 0 14px; font-size: 13px; color: var(--text-secondary); }
 
+/* ---- TREND CHARTS ---- */
+.trend-card {
+  min-height: 220px;
+}
+
+.trend-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+
+.trend-svg-wrap {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.025);
+  border-radius: 12px;
+  padding: 10px;
+  margin-bottom: 10px;
+}
+
+.trend-line {
+  width: 100%;
+  height: 100px;
+}
+
+.trend-blue path {
+  stroke: #5b8aff;
+}
+
+.trend-green path {
+  stroke: #34d399;
+}
+
+.trend-red path {
+  stroke: #f87171;
+}
+
+.trend-delta {
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 999px;
+  padding: 4px 10px;
+  border: 1px solid transparent;
+}
+
+.trend-up {
+  color: #6ee7b7;
+  background: rgba(52, 211, 153, 0.12);
+  border-color: rgba(52, 211, 153, 0.35);
+}
+
+.trend-down {
+  color: #fca5a5;
+  background: rgba(248, 113, 113, 0.12);
+  border-color: rgba(248, 113, 113, 0.35);
+}
+
 /* ---- TWO COL ---- */
 .two-col {
   display: grid;
@@ -418,12 +475,59 @@ body {
 }
 .footer a { color: var(--accent); text-decoration: none; }
 
+/* ---- SIMULATOR ---- */
+.sim-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.sim-item {
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.sim-item-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-bottom: 8px;
+}
+
+.sim-item-head strong {
+  color: var(--text-primary);
+  font-size: 13px;
+}
+
+.sim-range {
+  width: 100%;
+  accent-color: #5b8aff;
+}
+
+.sim-actions {
+  margin-top: 14px;
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.sim-note {
+  margin-top: 12px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
 /* ---- RESPONSIVE ---- */
 @media (max-width: 920px) {
   .hero { grid-template-columns: 1fr; }
   .grid-metrics { grid-template-columns: repeat(2, minmax(0,1fr)); }
   .two-col { grid-template-columns: 1fr; }
   .timeline-row { grid-template-columns: 1fr; gap: 3px; }
+  .sim-grid { grid-template-columns: 1fr; }
 }
 @media (max-width: 520px) {
   .grid-metrics { grid-template-columns: 1fr; }

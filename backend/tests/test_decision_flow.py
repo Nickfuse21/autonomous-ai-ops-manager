@@ -59,6 +59,7 @@ def test_demo_cycle_and_audit_endpoint():
     audit = client.get("/api/decisions")
     assert audit.status_code == 200
     assert audit.json()["count"] >= 1
+    assert "timestamp" in audit.json()["items"][-1]
 
 
 def test_human_approval_flow():
@@ -76,6 +77,20 @@ def test_human_approval_flow():
     approved = client.post(f"/api/approvals/{decision_id}/approve")
     assert approved.status_code == 200
     assert approved.json()["status"] in {"executed", "failed"}
+
+
+def test_human_reject_flow():
+    queued = client.post("/api/cycle/demo?autonomous_mode=false")
+    assert queued.status_code == 200
+
+    pending = client.get("/api/approvals")
+    assert pending.status_code == 200
+    assert pending.json()["count"] >= 1
+    decision_id = pending.json()["items"][0]["decision_id"]
+
+    rejected = client.post(f"/api/approvals/{decision_id}/reject")
+    assert rejected.status_code == 200
+    assert rejected.json()["status"] == "rejected_by_policy"
 
 
 def test_impact_summary_endpoint():

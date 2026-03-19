@@ -1,5 +1,10 @@
 # Autonomous AI Ops Manager
 
+![Python](https://img.shields.io/badge/Python-3.11+-3776AB?logo=python&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-API%20Engine-009688?logo=fastapi&logoColor=white)
+![React](https://img.shields.io/badge/React-Frontend-61DAFB?logo=react&logoColor=111)
+![Tests](https://img.shields.io/badge/Tests-Pytest%20Integrated-success)
+
 A local-first **autonomous decision engine** that monitors business data, detects anomalies, makes strategic decisions under uncertainty, executes actions, and learns from outcomes — the full agentic AI loop running on your machine.
 
 Built to be:
@@ -61,6 +66,8 @@ The frontend is a full operations dashboard — not just a demo page:
 - **Tab Navigation** — Overview, Explainability, Approvals, and History tabs for organized depth.
 - **Decision Run Summary** — full trace of the latest cycle with every data point.
 - **Explainability Panel** — every candidate action with visual score bars for rule, ML, and reasoning scores so you can see exactly why one action was chosen over another.
+- **Scenario Simulator Tab** — adjust sales/traffic/conversion/price/cost shocks with sliders and run custom decision cycles.
+- **Trend Analytics** — built-in charts for decision score trend, outcome trend, and action distribution.
 - **Human Approval Queue** — when running in approval mode, decisions land in a queue with Approve/Reject controls.
 - **Decision History** — persistent log of all past cycles with outcome badges.
 - **Two-Column Architecture View** — how the system works (6-stage loop) and technical patterns (governance, audit trail, idempotency, memory, observability).
@@ -113,6 +120,22 @@ npm run dev
 ```
 
 Open `http://localhost:5173` and click **Run Decision Cycle**.
+
+## Test Commands
+
+Backend integration tests:
+
+```powershell
+cd .\backend
+.\.venv\Scripts\python.exe -m pytest -q
+```
+
+Frontend build check:
+
+```powershell
+cd .\frontend
+npm run build
+```
 
 ## API Endpoints
 

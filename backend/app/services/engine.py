@@ -44,6 +44,7 @@ class DecisionCycleEngine:
         return {
             "trace_id": trace_id,
             "decision_id": decision.decision_id,
+            "timestamp": decision.timestamp.isoformat(),
             "decision_status": decision.status.value,
             "chosen_action": decision.chosen_action.action_type.value,
             "decision_score": decision.chosen_action.total_score,

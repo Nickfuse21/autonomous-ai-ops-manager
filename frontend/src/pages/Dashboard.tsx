@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import DecisionTimeline from "../components/DecisionTimeline";
 import PipelineViz from "../components/PipelineViz";
 import ScoreBar from "../components/ScoreBar";
+import TrendChart from "../components/TrendChart";
 
 type CycleResponse = {
   trace_id: string;
@@ -23,11 +24,14 @@ type CycleResponse = {
 };
 
 type DecisionSummary = {
+  timestamp?: string;
   trace_id: string;
   decision_id: string;
+  decision_status?: string;
   chosen_action: string;
   decision_score: number;
   outcome_effectiveness: string;
+  outcome_score?: number;
 };
 
 type PendingApproval = {
@@ -74,8 +78,18 @@ export default function Dashboard() {
   const [pendingApprovals, setPendingApprovals] = useState<PendingApproval[]>([]);
   const [impact, setImpact] = useState<ImpactSummary | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<"overview" | "explainability" | "approvals" | "history">("overview");
+  const [activeTab, setActiveTab] = useState<"overview" | "simulator" | "explainability" | "approvals" | "history">(
+    "overview"
+  );
   const [pipelineStep, setPipelineStep] = useState(-1);
+  const [simulator, setSimulator] = useState({
+    salesDeltaPct: -22,
+    trafficDeltaPct: 8,
+    conversionDeltaPct: -18,
+    inventoryDeltaPct: -12,
+    priceDeltaPct: -8,
+    costDeltaPct: 6,
+  });
 
   async function loadHistory() {
     try {
@@ -189,6 +203,63 @@ export default function Dashboard() {
     }
   }
 
+  function buildScenarioEvents() {
+    const baseline = [
+      { day: 0, sales: 122, traffic: 1010, conversions: 64, cost: 410, inventory: 240, price: 99 },
+      { day: 1, sales: 118, traffic: 990, conversions: 61, cost: 408, inventory: 235, price: 99 },
+      { day: 2, sales: 120, traffic: 1005, conversions: 62, cost: 412, inventory: 230, price: 99 },
+      { day: 3, sales: 117, traffic: 995, conversions: 60, cost: 409, inventory: 225, price: 99 },
+      { day: 4, sales: 115, traffic: 1000, conversions: 59, cost: 411, inventory: 220, price: 99 },
+      { day: 5, sales: 113, traffic: 1008, conversions: 58, cost: 413, inventory: 216, price: 99 },
+      { day: 6, sales: 110, traffic: 1015, conversions: 57, cost: 416, inventory: 212, price: 99 },
+      { day: 7, sales: 108, traffic: 1020, conversions: 56, cost: 418, inventory: 208, price: 99 },
+    ];
+
+    const now = new Date();
+    return baseline.map((row, idx) => {
+      const applyShock = idx >= baseline.length - 3;
+      const factor = (value: number, pct: number) => (applyShock ? value * (1 + pct / 100) : value);
+      const ts = new Date(now);
+      ts.setDate(now.getDate() - (baseline.length - idx));
+
+      return {
+        timestamp: ts.toISOString(),
+        product_id: "SIM-SKU-001",
+        sales: Number(factor(row.sales, simulator.salesDeltaPct).toFixed(2)),
+        traffic: Number(factor(row.traffic, simulator.trafficDeltaPct).toFixed(2)),
+        conversions: Number(factor(row.conversions, simulator.conversionDeltaPct).toFixed(2)),
+        cost: Number(factor(row.cost, simulator.costDeltaPct).toFixed(2)),
+        inventory: Math.max(1, Number(factor(row.inventory, simulator.inventoryDeltaPct).toFixed(2))),
+        price: Math.max(1, Number(factor(row.price, simulator.priceDeltaPct).toFixed(2))),
+      };
+    });
+  }
+
+  async function runScenario() {
+    setLoading(true);
+    setError(null);
+    setPipelineStep(0);
+    try {
+      const events = buildScenarioEvents();
+      const res = await fetch(`${API_BASE}/cycle/run`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ events, autonomous_mode: autonomousMode }),
+      });
+      if (!res.ok) throw new Error(`Scenario request failed: ${res.status}`);
+      const data = (await res.json()) as CycleResponse;
+      setCycle(data);
+      setPipelineStep(5);
+      await refreshAll();
+      setActiveTab("overview");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unknown error");
+      setPipelineStep(-1);
+    } finally {
+      setLoading(false);
+    }
+  }
+
   const metrics = useMemo(() => {
     if (!cycle) return { issue: "-", action: "-", score: "-", outcome: "-" };
     return {
@@ -201,10 +272,30 @@ export default function Dashboard() {
 
   const tabs = [
     { key: "overview" as const, label: "Overview" },
+    { key: "simulator" as const, label: "Scenario Simulator" },
     { key: "explainability" as const, label: "Explainability" },
     { key: "approvals" as const, label: `Approvals (${pendingApprovals.length})` },
     { key: "history" as const, label: "History" },
   ];
+
+  const trendSource = useMemo(() => [...history].reverse(), [history]);
+  const scoreTrend = useMemo(() => trendSource.map((item) => item.decision_score), [trendSource]);
+  const outcomeTrend = useMemo(
+    () => trendSource.map((item) => (item.outcome_score === undefined || item.outcome_score === null ? 0 : item.outcome_score)),
+    [trendSource]
+  );
+  const actionMix = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const item of history) {
+      counts.set(item.chosen_action, (counts.get(item.chosen_action) ?? 0) + 1);
+    }
+    const max = Math.max(1, ...Array.from(counts.values()));
+    return Array.from(counts.entries()).map(([action, count]) => ({
+      action,
+      count,
+      pct: (count / max) * 100,
+    }));
+  }, [history]);
 
   return (
     <>
@@ -239,6 +330,9 @@ export default function Dashboard() {
             <div className="hero-actions">
               <button className="btn btn-primary" onClick={runDemo} disabled={loading}>
                 {loading ? "Running Cycle..." : "Run Decision Cycle"}
+              </button>
+              <button className="btn btn-secondary" onClick={runScenario} disabled={loading}>
+                Run Custom Scenario
               </button>
               <button
                 className="btn btn-secondary"
@@ -353,6 +447,33 @@ export default function Dashboard() {
             />
 
             <div className="two-col">
+              <TrendChart title="Decision Score Trend" points={scoreTrend} colorClass="blue" />
+              <TrendChart title="Outcome Score Trend" points={outcomeTrend} colorClass="green" />
+            </div>
+
+            <div className="two-col">
+              <div className="glass-card section">
+                <h3 className="section-title">Action Distribution (Recent Runs)</h3>
+                <p className="section-desc">Shows which actions the system has selected most often.</p>
+                {actionMix.length === 0 ? (
+                  <p className="hero-subtitle">Run decision cycles to generate action distribution.</p>
+                ) : (
+                  <div className="history-list">
+                    {actionMix.map((item) => (
+                      <div key={item.action}>
+                        <div className="score-bar-label">
+                          <span>{prettyLabel(item.action)}</span>
+                          <span>{item.count}</span>
+                        </div>
+                        <div className="score-bar-bg">
+                          <div className="score-bar-fill" style={{ width: `${item.pct}%` }} />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
               <div className="glass-card section">
                 <h3 className="section-title">How This System Works</h3>
                 <p className="section-desc">6-stage autonomous loop that runs on every cycle.</p>
@@ -372,7 +493,9 @@ export default function Dashboard() {
                   ))}
                 </div>
               </div>
+            </div>
 
+            <div className="two-col">
               <div className="glass-card section">
                 <h3 className="section-title">Technical Architecture</h3>
                 <p className="section-desc">Production patterns implemented in this project.</p>
@@ -392,8 +515,99 @@ export default function Dashboard() {
                   ))}
                 </div>
               </div>
+              <div className="glass-card section">
+                <h3 className="section-title">Operational Notes</h3>
+                <p className="section-desc">What makes this useful in real teams.</p>
+                <div className="timeline">
+                  <div className="timeline-row">
+                    <div className="timeline-label">Decision Latency</div>
+                    <div className="timeline-value">Runs in seconds locally, suitable for rapid scenario drills.</div>
+                  </div>
+                  <div className="timeline-row">
+                    <div className="timeline-label">Safety</div>
+                    <div className="timeline-value">
+                      Supports autonomous execution and approval gate mode for controlled rollout.
+                    </div>
+                  </div>
+                  <div className="timeline-row">
+                    <div className="timeline-label">Data Portability</div>
+                    <div className="timeline-value">All memory and audit logs are local JSON, easy to inspect and version.</div>
+                  </div>
+                  <div className="timeline-row">
+                    <div className="timeline-label">Interview Value</div>
+                    <div className="timeline-value">
+                      Demonstrates end-to-end AI product thinking, not just model training.
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           </>
+        )}
+
+        {/* Scenario Simulator Tab */}
+        {activeTab === "simulator" && (
+          <section className="glass-card section">
+            <h3 className="section-title">Scenario Simulator</h3>
+            <p className="section-desc">
+              Create a custom business shock and run a full decision cycle on generated events.
+            </p>
+            <div className="sim-grid">
+              {[
+                ["salesDeltaPct", "Sales Shift (%)", -45, 25],
+                ["trafficDeltaPct", "Traffic Shift (%)", -35, 35],
+                ["conversionDeltaPct", "Conversion Shift (%)", -40, 25],
+                ["inventoryDeltaPct", "Inventory Shift (%)", -35, 20],
+                ["priceDeltaPct", "Price Shift (%)", -25, 20],
+                ["costDeltaPct", "Cost Shift (%)", -25, 40],
+              ].map(([key, label, min, max]) => (
+                <label key={String(key)} className="sim-item">
+                  <div className="sim-item-head">
+                    <span>{label}</span>
+                    <strong>{simulator[key as keyof typeof simulator]}%</strong>
+                  </div>
+                  <input
+                    className="sim-range"
+                    type="range"
+                    min={Number(min)}
+                    max={Number(max)}
+                    value={simulator[key as keyof typeof simulator]}
+                    onChange={(e) =>
+                      setSimulator((prev) => ({
+                        ...prev,
+                        [key]: Number(e.target.value),
+                      }))
+                    }
+                  />
+                </label>
+              ))}
+            </div>
+            <div className="sim-actions">
+              <button className="btn btn-primary" onClick={runScenario} disabled={loading}>
+                {loading ? "Running Scenario..." : "Run Scenario"}
+              </button>
+              <button
+                className="btn btn-secondary"
+                onClick={() =>
+                  setSimulator({
+                    salesDeltaPct: -22,
+                    trafficDeltaPct: 8,
+                    conversionDeltaPct: -18,
+                    inventoryDeltaPct: -12,
+                    priceDeltaPct: -8,
+                    costDeltaPct: 6,
+                  })
+                }
+                disabled={loading}
+              >
+                Reset to Default Shock
+              </button>
+            </div>
+            <div className="sim-note">
+              <strong>Current scenario:</strong> Sales {simulator.salesDeltaPct}% | Traffic {simulator.trafficDeltaPct}% |
+              Conversion {simulator.conversionDeltaPct}% | Price {simulator.priceDeltaPct}% | Cost {simulator.costDeltaPct}%
+            </div>
+          </section>
         )}
 
         {/* Explainability Tab */}
@@ -507,6 +721,7 @@ export default function Dashboard() {
                     </div>
                     <div className="history-sub">
                       Score: {item.decision_score.toFixed(4)} &middot; Trace: {item.trace_id}
+                      {item.timestamp ? ` · ${new Date(item.timestamp).toLocaleString()}` : ""}
                     </div>
                   </div>
                 ))}
