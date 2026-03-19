@@ -1,0 +1,28 @@
+.DS_Store
+Thumbs.db
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.venv/
+venv/
+
+# Node / frontend
+node_modules/
+dist/
+
+# IDE / local
+.vscode/
+.idea/
+
+# Runtime data and logs
+*.log
+backend/storage/*.json
+
