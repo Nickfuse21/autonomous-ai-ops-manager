@@ -29,8 +29,16 @@ def run_cycle(payload: DecisionCycleRequest) -> DecisionCycleResponse:
 
 
 @router.get("/decisions")
-def list_decisions() -> dict:
-    return {"count": len(engine.audit_log), "items": engine.audit_log}
+def list_decisions(
+    limit: int = Query(default=0, ge=0, le=500),
+    decision_status: str | None = Query(default=None),
+) -> dict:
+    items = engine.audit_log
+    if decision_status:
+        items = [record for record in items if record.get("decision_status") == decision_status]
+    if limit:
+        items = items[-limit:]
+    return {"count": len(items), "total_count": len(engine.audit_log), "items": items}
 
 
 @router.post("/cycle/demo", response_model=DecisionCycleResponse)

@@ -68,6 +68,7 @@ body {
   display: flex;
   align-items: center;
   gap: 16px;
+  flex-wrap: wrap;
 }
 
 .nav-health {
@@ -433,10 +434,42 @@ body {
   align-items: center;
 }
 
+.history-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
 .history-sub {
   margin-top: 5px;
   color: var(--text-secondary);
   font-size: 12px;
+}
+
+.history-mini {
+  margin-top: 10px;
+}
+
+.history-toolbar {
+  display: grid;
+  grid-template-columns: 1.4fr 0.9fr 0.7fr auto;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.field-input,
+.field-select {
+  width: 100%;
+  border-radius: 10px;
+  border: 1px solid rgba(255,255,255,0.16);
+  background: rgba(255,255,255,0.04);
+  color: var(--text-primary);
+  padding: 9px 10px;
+  font-size: 12px;
+}
+
+.field-select option {
+  color: #111827;
 }
 
 /* ---- BADGES ---- */
@@ -528,6 +561,7 @@ body {
   .two-col { grid-template-columns: 1fr; }
   .timeline-row { grid-template-columns: 1fr; gap: 3px; }
   .sim-grid { grid-template-columns: 1fr; }
+  .history-toolbar { grid-template-columns: 1fr; }
 }
 @media (max-width: 520px) {
   .grid-metrics { grid-template-columns: 1fr; }

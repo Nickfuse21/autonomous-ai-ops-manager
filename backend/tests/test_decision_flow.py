@@ -106,3 +106,22 @@ def test_impact_summary_endpoint():
         "estimated_revenue_lift_score",
     }:
         assert key in body
+
+
+def test_decisions_endpoint_supports_filters():
+    # Ensure we have at least one record in audit log.
+    response = client.post("/api/cycle/demo")
+    assert response.status_code == 200
+
+    all_decisions = client.get("/api/decisions")
+    assert all_decisions.status_code == 200
+    assert "total_count" in all_decisions.json()
+
+    limited = client.get("/api/decisions?limit=1")
+    assert limited.status_code == 200
+    assert limited.json()["count"] <= 1
+
+    executed_only = client.get("/api/decisions?decision_status=executed")
+    assert executed_only.status_code == 200
+    for item in executed_only.json()["items"]:
+        assert item["decision_status"] == "executed"

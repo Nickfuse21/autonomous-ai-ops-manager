@@ -68,6 +68,14 @@ function statusClass(eff: string): string {
   return "badge badge-neutral";
 }
 
+function decisionStatusClass(status: string | undefined): string {
+  if (!status) return "badge badge-neutral";
+  if (status === "executed") return "badge badge-positive";
+  if (status === "needs_human_approval") return "badge badge-warning";
+  if (status === "failed") return "badge badge-negative";
+  return "badge badge-neutral";
+}
+
 export default function Dashboard() {
   const [loading, setLoading] = useState(false);
   const [autonomousMode, setAutonomousMode] = useState(true);
@@ -78,9 +86,13 @@ export default function Dashboard() {
   const [pendingApprovals, setPendingApprovals] = useState<PendingApproval[]>([]);
   const [impact, setImpact] = useState<ImpactSummary | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [lastRefreshAt, setLastRefreshAt] = useState<Date | null>(null);
   const [activeTab, setActiveTab] = useState<"overview" | "simulator" | "explainability" | "approvals" | "history">(
     "overview"
   );
+  const [historyLimit, setHistoryLimit] = useState(20);
+  const [historyStatusFilter, setHistoryStatusFilter] = useState("all");
+  const [historySearch, setHistorySearch] = useState("");
   const [pipelineStep, setPipelineStep] = useState(-1);
   const [simulator, setSimulator] = useState({
     salesDeltaPct: -22,
@@ -93,10 +105,15 @@ export default function Dashboard() {
 
   async function loadHistory() {
     try {
-      const res = await fetch(`${API_BASE}/decisions`);
+      const params = new URLSearchParams();
+      params.set("limit", String(historyLimit));
+      if (historyStatusFilter !== "all") {
+        params.set("decision_status", historyStatusFilter);
+      }
+      const res = await fetch(`${API_BASE}/decisions?${params.toString()}`);
       if (!res.ok) return;
       const data = (await res.json()) as { items: DecisionSummary[] };
-      setHistory(data.items.slice(-10).reverse());
+      setHistory(data.items.slice().reverse());
     } catch {
       /* resilient */
     }
@@ -135,6 +152,7 @@ export default function Dashboard() {
 
   async function refreshAll() {
     await Promise.all([loadHistory(), loadPendingApprovals(), loadImpactSummary(), checkHealth()]);
+    setLastRefreshAt(new Date());
   }
 
   function exportLatestReport() {
@@ -156,6 +174,43 @@ export default function Dashboard() {
     URL.revokeObjectURL(url);
   }
 
+  function exportHistoryCsv() {
+    if (history.length === 0) {
+      return;
+    }
+    const rows = [
+      ["timestamp", "trace_id", "decision_id", "decision_status", "chosen_action", "decision_score", "outcome_effectiveness", "outcome_score"],
+      ...history.map((item) => [
+        item.timestamp ?? "",
+        item.trace_id,
+        item.decision_id,
+        item.decision_status ?? "",
+        item.chosen_action,
+        String(item.decision_score ?? ""),
+        item.outcome_effectiveness ?? "",
+        String(item.outcome_score ?? ""),
+      ]),
+    ];
+    const csv = rows.map((row) => row.map((v) => `"${String(v).replaceAll("\"", "\"\"")}"`).join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `ops-history-${new Date().toISOString().slice(0, 19).replaceAll(":", "-")}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  }
+
+  async function copyTraceId(traceId: string) {
+    try {
+      await navigator.clipboard.writeText(traceId);
+    } catch {
+      // Keep this non-blocking for browser compatibility.
+    }
+  }
+
   useEffect(() => {
     void refreshAll();
   }, []);
@@ -165,6 +220,10 @@ export default function Dashboard() {
     const timer = window.setInterval(() => void refreshAll(), 15000);
     return () => window.clearInterval(timer);
   }, [autoRefresh]);
+
+  useEffect(() => {
+    void loadHistory();
+  }, [historyLimit, historyStatusFilter]);
 
   async function runDemo() {
     setLoading(true);
@@ -297,6 +356,19 @@ export default function Dashboard() {
     }));
   }, [history]);
 
+  const filteredHistory = useMemo(() => {
+    const q = historySearch.trim().toLowerCase();
+    if (!q) {
+      return history;
+    }
+    return history.filter(
+      (item) =>
+        item.trace_id.toLowerCase().includes(q) ||
+        item.decision_id.toLowerCase().includes(q) ||
+        item.chosen_action.toLowerCase().includes(q)
+    );
+  }, [history, historySearch]);
+
   return (
     <>
       {/* Navbar */}
@@ -306,6 +378,9 @@ export default function Dashboard() {
           <span>Autonomous Ops Manager</span>
         </div>
         <div className="nav-right">
+          <div className="nav-health">
+            {lastRefreshAt ? `Updated ${lastRefreshAt.toLocaleTimeString()}` : "Not refreshed yet"}
+          </div>
           <div className="nav-health">
             <span className={`health-dot ${backendHealthy ? "health-up" : "health-down"}`} />
             {backendHealthy === null ? "Checking..." : backendHealthy ? "Backend Online" : "Backend Offline"}
@@ -707,21 +782,60 @@ export default function Dashboard() {
               Persistent log of all decision cycles stored locally. Each entry includes the action taken, score, and
               outcome.
             </p>
-            {history.length === 0 ? (
+            <div className="history-toolbar">
+              <input
+                className="field-input"
+                placeholder="Search by trace, decision id, action"
+                value={historySearch}
+                onChange={(e) => setHistorySearch(e.target.value)}
+              />
+              <select
+                className="field-select"
+                value={historyStatusFilter}
+                onChange={(e) => setHistoryStatusFilter(e.target.value)}
+              >
+                <option value="all">All statuses</option>
+                <option value="executed">Executed</option>
+                <option value="needs_human_approval">Needs approval</option>
+                <option value="rejected_by_policy">Rejected</option>
+                <option value="failed">Failed</option>
+              </select>
+              <select
+                className="field-select"
+                value={String(historyLimit)}
+                onChange={(e) => setHistoryLimit(Number(e.target.value))}
+              >
+                <option value="10">Last 10</option>
+                <option value="20">Last 20</option>
+                <option value="50">Last 50</option>
+              </select>
+              <button className="btn btn-sm btn-secondary" onClick={exportHistoryCsv} disabled={history.length === 0}>
+                Export CSV
+              </button>
+            </div>
+            {filteredHistory.length === 0 ? (
               <p className="hero-subtitle">Run a decision cycle to generate history records.</p>
             ) : (
               <div className="history-list">
-                {history.map((item) => (
+                {filteredHistory.map((item) => (
                   <div key={item.decision_id} className="history-item">
                     <div className="history-main">
                       <strong>{prettyLabel(item.chosen_action)}</strong>
-                      <span className={statusClass(item.outcome_effectiveness)}>
-                        {prettyLabel(item.outcome_effectiveness)}
-                      </span>
+                      <div className="history-actions">
+                        <span className={decisionStatusClass(item.decision_status)}>{prettyLabel(item.decision_status)}</span>
+                        <span className={statusClass(item.outcome_effectiveness)}>
+                          {prettyLabel(item.outcome_effectiveness)}
+                        </span>
+                      </div>
                     </div>
                     <div className="history-sub">
                       Score: {item.decision_score.toFixed(4)} &middot; Trace: {item.trace_id}
                       {item.timestamp ? ` · ${new Date(item.timestamp).toLocaleString()}` : ""}
+                    </div>
+                    <div className="history-mini">
+                      <button className="btn btn-sm btn-secondary" onClick={() => void copyTraceId(item.trace_id)}>
+                        Copy Trace ID
+                      </button>
                     </div>
                   </div>
                 ))}
