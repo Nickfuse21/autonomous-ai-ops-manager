@@ -1,11 +1,16 @@
 # Autonomous AI Ops Manager
 
-**Author:** [@Nickfuse21](https://github.com/Nickfuse21)
-
 ![Python](https://img.shields.io/badge/Python-3.11+-3776AB?logo=python&logoColor=white)
 ![FastAPI](https://img.shields.io/badge/FastAPI-API%20Engine-009688?logo=fastapi&logoColor=white)
 ![React](https://img.shields.io/badge/React-Frontend-61DAFB?logo=react&logoColor=111)
 ![Tests](https://img.shields.io/badge/Tests-Pytest%20Integrated-success)
+
+## Maintainer
+
+| | |
+|:---|:---|
+| **GitHub profile** | [**@Nickfuse21**](https://github.com/Nickfuse21) |
+| **This repository** | [**Nickfuse21/autonomous-ai-ops-manager**](https://github.com/Nickfuse21/autonomous-ai-ops-manager) |
 
 A local-first **autonomous decision engine** that monitors business data, detects anomalies, makes strategic decisions under uncertainty, executes actions, and learns from outcomes — the full agentic AI loop running on your machine.
 

@@ -450,6 +450,14 @@ export default function Dashboard() {
           <div className="nav-logo">AI</div>
           <span>Autonomous Ops Manager</span>
         </div>
+        <a
+          className="nav-author-link"
+          href="https://github.com/Nickfuse21/autonomous-ai-ops-manager"
+          target="_blank"
+          rel="noreferrer"
+        >
+          Nickfuse21
+        </a>
         <div className="nav-right">
           <div className="nav-health">
             {lastRefreshAt ? `Updated ${lastRefreshAt.toLocaleTimeString()}` : "Not refreshed yet"}
@@ -469,6 +477,12 @@ export default function Dashboard() {
         <section className="hero dashboard-section">
           <div className="glass-card hero-main">
             <span className="chip">Agentic AI System</span>
+            <p className="hero-byline">
+              By{" "}
+              <a href="https://github.com/Nickfuse21" target="_blank" rel="noreferrer">
+                Nickfuse21
+              </a>
+            </p>
             <h1 className="hero-title">Autonomous Decision Engine for Business Operations</h1>
             <p className="hero-subtitle">
               A self-improving AI system that monitors business data, detects anomalies, makes strategic decisions under
