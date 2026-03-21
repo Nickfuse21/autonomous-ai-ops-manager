@@ -42,7 +42,7 @@ export default function TrendChart({ title, points, colorClass = "blue", valueSu
       ) : (
         <div className="trend-svg-wrap">
           <svg viewBox="0 0 300 90" className={`trend-line trend-${colorClass}`} role="img" aria-label={title}>
-            <path d={path} fill="none" strokeWidth="3" />
+            <path d={path} fill="none" />
           </svg>
         </div>
       )}

@@ -1,5 +1,7 @@
 # Autonomous AI Ops Manager
 
+**Author:** [@Nickfuse21](https://github.com/Nickfuse21)
+
 ![Python](https://img.shields.io/badge/Python-3.11+-3776AB?logo=python&logoColor=white)
 ![FastAPI](https://img.shields.io/badge/FastAPI-API%20Engine-009688?logo=fastapi&logoColor=white)
 ![React](https://img.shields.io/badge/React-Frontend-61DAFB?logo=react&logoColor=111)
@@ -121,6 +123,15 @@ npm run dev
 
 Open `http://localhost:5173` and click **Run Decision Cycle**.
 
+## Environment variables
+
+| Context | Variable | Purpose |
+|---------|----------|---------|
+| Backend | `CORS_ORIGINS` | Comma-separated browser origins (default `*` for local dev). Example: `https://app.example.com,http://localhost:5173` |
+| Frontend (Vite) | `VITE_API_BASE` | API origin without trailing slash (default `http://localhost:8000`). The UI calls `{VITE_API_BASE}/api/...`. |
+
+Create `frontend/.env.production` for deploy builds, e.g. `VITE_API_BASE=https://api.example.com`.
+
 ## Test Commands
 
 Backend integration tests:
@@ -142,6 +153,7 @@ npm run build
 | Method | Endpoint | Purpose |
 |--------|----------|---------|
 | GET | `/api/health` | Health check |
+| GET | `/api/dashboard` | Bootstrap payload: impact, approvals, decisions slice, `server_time` |
 | POST | `/api/cycle/run` | Run full cycle on provided events |
 | POST | `/api/cycle/demo` | Run cycle on sample scenario |
 | GET | `/api/decisions` | View audit summaries |

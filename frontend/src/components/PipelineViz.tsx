@@ -13,11 +13,16 @@ type PipelineVizProps = {
 
 export default function PipelineViz({ activeStep }: PipelineVizProps) {
   return (
-    <div className="glass-card pipeline">
+    <div className="glass-card pipeline" role="navigation" aria-label="Autonomous decision pipeline stages">
       {STEPS.map((step, idx) => (
         <div key={step.key} style={{ display: "flex", alignItems: "center" }}>
           <div className="pipeline-step">
-            <div className={`pipeline-icon ${idx <= activeStep ? "active" : "inactive"}`}>{step.icon}</div>
+            <div
+              className={`pipeline-icon ${idx <= activeStep ? "active" : "inactive"}`}
+              aria-current={idx === activeStep && activeStep >= 0 ? "step" : undefined}
+            >
+              {step.icon}
+            </div>
             <div className="pipeline-label">{step.label}</div>
           </div>
           {idx < STEPS.length - 1 && <span className="pipeline-arrow">&rarr;</span>}

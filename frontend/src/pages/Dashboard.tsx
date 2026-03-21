@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import DecisionTimeline from "../components/DecisionTimeline";
 import PipelineViz from "../components/PipelineViz";
 import ScoreBar from "../components/ScoreBar";
@@ -52,7 +52,27 @@ type ImpactSummary = {
   estimated_revenue_lift_score: number;
 };
 
-const API_BASE = "http://localhost:8000/api";
+type DashboardBootstrap = {
+  impact: ImpactSummary;
+  pending_approvals: { count: number; items: PendingApproval[] };
+  decisions: { items: DecisionSummary[]; total_count: number; count: number };
+  server_time: string;
+};
+
+const API_ORIGIN = (import.meta.env.VITE_API_BASE ?? "http://localhost:8000").replace(/\/$/, "");
+const API_BASE = `${API_ORIGIN}/api`;
+
+function usePrefersReducedMotion(): boolean {
+  const [reduced, setReduced] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const update = () => setReduced(mq.matches);
+    update();
+    mq.addEventListener("change", update);
+    return () => mq.removeEventListener("change", update);
+  }, []);
+  return reduced;
+}
 
 function prettyLabel(value: string | undefined): string {
   if (!value) return "-";
@@ -103,6 +123,11 @@ export default function Dashboard() {
     costDeltaPct: 6,
   });
 
+  const reducedMotion = usePrefersReducedMotion();
+  const displayTotalDecisionsRef = useRef(0);
+  const [displayTotalDecisions, setDisplayTotalDecisions] = useState(0);
+  const skipHistoryEffect = useRef(true);
+
   async function loadHistory() {
     try {
       const params = new URLSearchParams();
@@ -151,8 +176,26 @@ export default function Dashboard() {
   }
 
   async function refreshAll() {
-    await Promise.all([loadHistory(), loadPendingApprovals(), loadImpactSummary(), checkHealth()]);
-    setLastRefreshAt(new Date());
+    try {
+      const params = new URLSearchParams();
+      params.set("limit", String(historyLimit));
+      if (historyStatusFilter !== "all") {
+        params.set("decision_status", historyStatusFilter);
+      }
+      const res = await fetch(`${API_BASE}/dashboard?${params.toString()}`);
+      if (!res.ok) {
+        throw new Error("dashboard bootstrap failed");
+      }
+      const data = (await res.json()) as DashboardBootstrap;
+      setImpact(data.impact);
+      setPendingApprovals(data.pending_approvals.items);
+      setHistory(data.decisions.items.slice().reverse());
+      setLastRefreshAt(new Date(data.server_time));
+      setBackendHealthy(true);
+    } catch {
+      await Promise.all([loadHistory(), loadPendingApprovals(), loadImpactSummary(), checkHealth()]);
+      setLastRefreshAt(new Date());
+    }
   }
 
   function exportLatestReport() {
@@ -222,8 +265,38 @@ export default function Dashboard() {
   }, [autoRefresh]);
 
   useEffect(() => {
+    if (skipHistoryEffect.current) {
+      skipHistoryEffect.current = false;
+      return;
+    }
     void loadHistory();
   }, [historyLimit, historyStatusFilter]);
+
+  useEffect(() => {
+    const endVal = impact?.total_decisions ?? 0;
+    if (reducedMotion) {
+      displayTotalDecisionsRef.current = endVal;
+      setDisplayTotalDecisions(endVal);
+      return;
+    }
+    let rafId = 0;
+    const startVal = displayTotalDecisionsRef.current;
+    const t0 = performance.now();
+    const dur = 700;
+    function tick(now: number) {
+      const p = Math.min(1, (now - t0) / dur);
+      const eased = 1 - (1 - p) ** 3;
+      const v = Math.round(startVal + (endVal - startVal) * eased);
+      setDisplayTotalDecisions(v);
+      if (p < 1) {
+        rafId = requestAnimationFrame(tick);
+      } else {
+        displayTotalDecisionsRef.current = endVal;
+      }
+    }
+    rafId = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(rafId);
+  }, [impact?.total_decisions, reducedMotion]);
 
   async function runDemo() {
     setLoading(true);
@@ -393,7 +466,7 @@ export default function Dashboard() {
 
       <div className="app-shell">
         {/* Hero */}
-        <section className="hero">
+        <section className="hero dashboard-section">
           <div className="glass-card hero-main">
             <span className="chip">Agentic AI System</span>
             <h1 className="hero-title">Autonomous Decision Engine for Business Operations</h1>
@@ -439,63 +512,76 @@ export default function Dashboard() {
             </div>
             <div>
               <div className="side-label">Total Decisions Made</div>
-              <div className="side-value">{impact?.total_decisions ?? 0}</div>
+              <div className="side-value mono">{displayTotalDecisions}</div>
             </div>
             <div>
               <div className="side-label">Positive Outcome Rate</div>
-              <div className="side-value">{impact ? `${(impact.positive_outcome_rate * 100).toFixed(1)}%` : "-"}</div>
+              <div className="side-value mono">{impact ? `${(impact.positive_outcome_rate * 100).toFixed(1)}%` : "-"}</div>
             </div>
             <div>
               <div className="side-label">Pending Approvals</div>
-              <div className="side-value">{pendingApprovals.length}</div>
+              <div className="side-value mono">{pendingApprovals.length}</div>
             </div>
           </div>
         </section>
 
         {/* Pipeline Visualization */}
-        <PipelineViz activeStep={pipelineStep} />
+        <div className="dashboard-section">
+          <PipelineViz activeStep={pipelineStep} />
+        </div>
 
         {/* KPI Metrics */}
-        <section className="grid-metrics">
-          <article className="glass-card metric-card">
-            <div className="metric-title">Detected Issue</div>
-            <div className="metric-value">{metrics.issue}</div>
-          </article>
-          <article className="glass-card metric-card">
-            <div className="metric-title">Chosen Action</div>
-            <div className="metric-value">{metrics.action}</div>
-          </article>
-          <article className="glass-card metric-card">
-            <div className="metric-title">Decision Score</div>
-            <div className="metric-value">{metrics.score}</div>
-          </article>
-          <article className="glass-card metric-card">
-            <div className="metric-title">Outcome</div>
-            <div className="metric-value">{metrics.outcome}</div>
-          </article>
+        <section className="grid-metrics dashboard-section">
+          {loading ? (
+            [0, 1, 2, 3].map((i) => (
+              <article key={i} className="glass-card metric-card is-skeleton" aria-hidden>
+                <div className="skeleton-line short" />
+                <div className="skeleton-line" />
+              </article>
+            ))
+          ) : (
+            <>
+              <article className="glass-card metric-card">
+                <div className="metric-title">Detected Issue</div>
+                <div className="metric-value">{metrics.issue}</div>
+              </article>
+              <article className="glass-card metric-card">
+                <div className="metric-title">Chosen Action</div>
+                <div className="metric-value">{metrics.action}</div>
+              </article>
+              <article className="glass-card metric-card">
+                <div className="metric-title">Decision Score</div>
+                <div className="metric-value mono">{metrics.score}</div>
+              </article>
+              <article className="glass-card metric-card">
+                <div className="metric-title">Outcome</div>
+                <div className="metric-value">{metrics.outcome}</div>
+              </article>
+            </>
+          )}
         </section>
 
-        <section className="grid-metrics">
+        <section className="grid-metrics dashboard-section">
           <article className="glass-card metric-card">
             <div className="metric-title">Total Decisions</div>
-            <div className="metric-value">{impact?.total_decisions ?? "-"}</div>
+            <div className="metric-value mono">{impact ? displayTotalDecisions : "-"}</div>
           </article>
           <article className="glass-card metric-card">
             <div className="metric-title">Executed</div>
-            <div className="metric-value">{impact?.executed_count ?? "-"}</div>
+            <div className="metric-value mono">{impact?.executed_count ?? "-"}</div>
           </article>
           <article className="glass-card metric-card">
             <div className="metric-title">Avg Decision Score</div>
-            <div className="metric-value">{impact?.avg_decision_score?.toFixed(3) ?? "-"}</div>
+            <div className="metric-value mono">{impact?.avg_decision_score?.toFixed(3) ?? "-"}</div>
           </article>
           <article className="glass-card metric-card">
             <div className="metric-title">Revenue Lift Score</div>
-            <div className="metric-value">{impact?.estimated_revenue_lift_score?.toFixed(3) ?? "-"}</div>
+            <div className="metric-value mono">{impact?.estimated_revenue_lift_score?.toFixed(3) ?? "-"}</div>
           </article>
         </section>
 
         {/* Tabs */}
-        <div style={{ marginTop: 20, display: "flex", gap: 8, flexWrap: "wrap" }}>
+        <div className="tab-bar dashboard-section">
           {tabs.map((t) => (
             <button
               key={t.key}
@@ -507,15 +593,16 @@ export default function Dashboard() {
           ))}
         </div>
 
+        <div key={activeTab} className="tab-panel">
         {/* Overview Tab */}
         {activeTab === "overview" && (
           <>
             <DecisionTimeline
               traceId={cycle?.trace_id}
-              issueType={prettyLabel(cycle?.situation.issue_type)}
-              actionType={prettyLabel(cycle?.decision.chosen_action.action_type)}
-              decisionScore={cycle?.decision.chosen_action.total_score}
-              confidence={cycle?.situation.confidence}
+              issueType={prettyLabel(cycle?.situation?.issue_type)}
+              actionType={prettyLabel(cycle?.decision?.chosen_action?.action_type)}
+              decisionScore={cycle?.decision?.chosen_action?.total_score}
+              confidence={cycle?.situation?.confidence}
               memoryMatches={cycle?.memory_matches?.length ?? 0}
               effectiveness={prettyLabel(cycle?.outcome?.effectiveness)}
               outcomeScore={cycle?.outcome?.score}
@@ -843,10 +930,14 @@ export default function Dashboard() {
             )}
           </section>
         )}
+        </div>
 
         {/* Footer */}
         <footer className="footer">
-          Autonomous AI Ops Manager &middot; Built with FastAPI + React &middot; Local-first agentic decision system
+          Autonomous AI Ops Manager &middot; FastAPI + React &middot;{" "}
+          <a href="https://github.com/Nickfuse21/autonomous-ai-ops-manager" target="_blank" rel="noreferrer">
+            Nickfuse21
+          </a>
         </footer>
       </div>
     </>

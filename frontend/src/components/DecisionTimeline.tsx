@@ -32,7 +32,9 @@ export default function DecisionTimeline(props: DecisionTimelineProps) {
         {rows.map((row) => (
           <div key={row.label} className="timeline-row">
             <div className="timeline-label">{row.label}</div>
-            <div className="timeline-value">{row.value ?? "-"}</div>
+            <div className={`timeline-value ${row.label === "Trace Id" || row.label === "Decision Score" || row.label === "Confidence" || row.label === "Outcome Score" ? "mono" : ""}`}>
+              {row.value ?? "-"}
+            </div>
           </div>
         ))}
       </div>

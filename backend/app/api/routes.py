@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import csv
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import List
 
@@ -18,6 +18,32 @@ engine = DecisionCycleEngine()
 @router.get("/health")
 def health() -> dict:
     return {"status": "ok", "service": "autonomous-ai-ops-manager"}
+
+
+@router.get("/dashboard")
+def dashboard(
+    limit: int = Query(default=20, ge=0, le=500),
+    decision_status: str | None = Query(default=None),
+) -> dict:
+    """Single round-trip bootstrap for the ops dashboard."""
+    audit = engine.audit_log
+    total_count = len(audit)
+    decision_items = list(audit)
+    if decision_status:
+        decision_items = [r for r in decision_items if r.get("decision_status") == decision_status]
+    if limit:
+        decision_items = decision_items[-limit:]
+    pending = engine.list_pending_approvals()
+    return {
+        "impact": engine.get_impact_summary(),
+        "pending_approvals": {"count": len(pending), "items": pending},
+        "decisions": {
+            "items": decision_items,
+            "total_count": total_count,
+            "count": len(decision_items),
+        },
+        "server_time": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+    }
 
 
 @router.post("/cycle/run", response_model=DecisionCycleResponse)
