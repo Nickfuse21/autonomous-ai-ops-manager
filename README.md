@@ -157,15 +157,18 @@ npm run build
 
 | Method | Endpoint | Purpose |
 |--------|----------|---------|
-| GET | `/api/health` | Health check |
+| GET | `/api/health` | Health + `version` + `capabilities` |
 | GET | `/api/dashboard` | Bootstrap payload: impact, approvals, decisions slice, `server_time` |
 | POST | `/api/cycle/run` | Run full cycle on provided events |
 | POST | `/api/cycle/demo` | Run cycle on sample scenario |
+| POST | `/api/forecast/predict` | Sales forecast from `recent_sales`, `traffic`, `conversions` (pluggable model) |
 | GET | `/api/decisions` | View audit summaries |
 | GET | `/api/impact-summary` | Business impact metrics |
 | GET | `/api/approvals` | List pending human approvals |
 | POST | `/api/approvals/{id}/approve` | Approve and execute |
 | POST | `/api/approvals/{id}/reject` | Reject pending action |
+
+**Observability:** Send `X-Request-ID` or `X-Correlation-ID` on any request; the API echoes it as `X-Request-ID` and uses it as the trace id for that request (ties logs and downstream `trace_id` fields together).
 
 ## Where Data Is Stored
 

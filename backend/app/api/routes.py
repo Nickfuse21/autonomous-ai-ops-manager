@@ -8,7 +8,13 @@ from typing import List
 from fastapi import APIRouter, HTTPException, Query
 
 from app.core.logging import get_trace_id
-from app.schemas.contracts import BusinessEvent, DecisionCycleRequest, DecisionCycleResponse
+from app.schemas.contracts import (
+    BusinessEvent,
+    DecisionCycleRequest,
+    DecisionCycleResponse,
+    ForecastPredictRequest,
+    ForecastPredictResponse,
+)
 from app.services.engine import DecisionCycleEngine
 
 router = APIRouter(prefix="/api", tags=["ops-manager"])
@@ -17,7 +23,22 @@ engine = DecisionCycleEngine()
 
 @router.get("/health")
 def health() -> dict:
-    return {"status": "ok", "service": "autonomous-ai-ops-manager"}
+    return {
+        "status": "ok",
+        "service": "autonomous-ai-ops-manager",
+        "version": "0.1.0",
+        "capabilities": ["decision_cycle", "forecast", "approvals", "audit_export"],
+    }
+
+
+@router.post("/forecast/predict", response_model=ForecastPredictResponse)
+def predict_sales_forecast(payload: ForecastPredictRequest) -> ForecastPredictResponse:
+    result = engine.predict_sales(payload.recent_sales, payload.traffic, payload.conversions)
+    return ForecastPredictResponse(
+        predicted_sales=result.predicted_sales,
+        confidence=result.confidence,
+        version=result.version,
+    )
 
 
 @router.get("/dashboard")

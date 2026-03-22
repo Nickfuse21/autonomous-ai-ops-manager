@@ -9,7 +9,7 @@ from app.agents.ingestion_agent import IngestionAgent
 from app.agents.outcome_agent import OutcomeEvaluatorAgent
 from app.core.logging import get_logger
 from app.memory.vector_store import DecisionMemoryStore
-from app.models.forecast import SalesForecaster
+from app.models.forecast import ForecastResult, SalesForecaster
 from app.policy.rules import PolicyEngine
 from app.schemas.contracts import BusinessEvent, DecisionCycleResponse
 from app.schemas.contracts import DecisionStatus
@@ -29,6 +29,10 @@ class DecisionCycleEngine:
         self.audit_store = LocalAuditStore()
         self.audit_log: list[dict] = self.audit_store.read_all()
         self.pending_approvals: dict[str, dict[str, Any]] = {}
+
+    def predict_sales(self, recent_sales: List[float], traffic: float, conversions: float) -> ForecastResult:
+        """Expose the forecaster for direct API / tooling without running a full decision cycle."""
+        return self.forecaster.predict_next_sales(recent_sales, traffic, conversions)
 
     def _persist_audit(self, record: dict[str, Any]) -> None:
         self.audit_log.append(record)

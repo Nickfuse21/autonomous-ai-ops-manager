@@ -116,3 +116,17 @@ class DecisionCycleResponse(BaseModel):
     execution: Optional[ActionExecutionResult]
     outcome: Optional[OutcomeReport]
     memory_matches: List[Dict[str, Any]] = Field(default_factory=list)
+
+
+class ForecastPredictRequest(BaseModel):
+    """Input for the pluggable sales forecaster (heuristic today; swap model without API churn)."""
+
+    recent_sales: List[float] = Field(default_factory=list, description="Daily (or period) sales; last 7 used")
+    traffic: float = Field(default=0.0, ge=0, description="Visitors or sessions in the forecast window")
+    conversions: float = Field(default=0.0, ge=0, description="Conversions in the same window as traffic")
+
+
+class ForecastPredictResponse(BaseModel):
+    predicted_sales: float
+    confidence: float
+    version: str
